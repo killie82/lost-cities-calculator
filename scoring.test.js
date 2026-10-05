@@ -18,11 +18,26 @@ test('player totals include positive, negative, and untouched colors', () => {
   assert.equal(scorePlayer([{ numbers: [8, 9, 10], wagers: 0 }, { numbers: [2], wagers: 1 }, { numbers: [], wagers: 0 }]), -29);
 });
 test('three rounds contain independent player and expedition records', () => {
-  const rounds = createRounds();
+  const rounds = createRounds(5);
   rounds[0][0][0].numbers.push(10);
   assert.equal(rounds.length, 3);
   assert.equal(rounds[0].length, 2);
   assert.equal(rounds[0][0].length, 5);
   assert.deepEqual(rounds[0][1][0].numbers, []);
   assert.deepEqual(rounds[1][0][0].numbers, []);
+});
+
+test('expanded games default to six independent expeditions', () => {
+  const rounds = createRounds();
+  assert.equal(rounds[0][0].length, 6);
+  rounds[0][0][5].numbers.push(10);
+  rounds[0][0][5].wagers.push(2);
+  assert.equal(scoreExpedition(rounds[0][0][5]).score, -20);
+  assert.deepEqual(rounds[0][1][5], { numbers: [], wagers: [] });
+  assert.deepEqual(rounds[1][0][5], { numbers: [], wagers: [] });
+});
+
+test('tap-card wager selections count toward multipliers and bonuses', () => {
+  assert.equal(scoreExpedition({ numbers: [], wagers: [1, 3] }).score, -60);
+  assert.equal(scoreExpedition({ numbers: [6, 7, 8, 9, 10], wagers: [1, 2, 3] }).score, 100);
 });
