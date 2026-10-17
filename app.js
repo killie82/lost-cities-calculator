@@ -1,11 +1,22 @@
-import { createRounds, scoreExpedition, scorePlayer } from './scoring.js';
+import { scoreExpedition, scorePlayer } from './scoring.js';
+import { hasCards, startGame, resetGame, toggleCard, goBack, goNext } from './game.js';
+import { gameStorage, setupPlatform } from './platform.js';
 
 const allColors = ['Yellow', 'Blue', 'White', 'Green', 'Red', 'Purple'];
 const app = document.querySelector('#app');
-let game = { names: ['Player 1', 'Player 2'], expeditionCount: 6, rounds: createRounds(), round: 0, step: 0, screen: 'start' };
+const artwork = import.meta.glob('./assets/cards/*.webp', { eager: true, query: '?url', import: 'default' });
+const game = await gameStorage.load();
+const storageStatus = document.querySelector('#storage-status');
+
+async function saveGame() {
+  const saved = await gameStorage.save(game);
+  storageStatus.textContent = saved
+    ? 'Your game is saved automatically on this device.'
+    : 'Your game could not be saved. Keep this app open to retain your scores.';
+}
 
 function confirmReset(onConfirm = () => {
-  game = { names: game.names, expeditionCount: game.expeditionCount, rounds: createRounds(game.expeditionCount), round: 0, step: 0, screen: 'start' };
+  resetGame(game);
   render();
 }, message = 'This clears all cards and scores from all three rounds. Your player names and game edition will be kept.') {
   const previousFocus = document.activeElement;
@@ -45,7 +56,7 @@ function addCardArtwork(card, color, slot, label) {
   const art = element('span', undefined, 'card-art');
   art.setAttribute('aria-hidden', 'true');
   const image = document.createElement('img');
-  image.src = `assets/cards/${color.toLowerCase()}.webp`;
+  image.src = artwork[`./assets/cards/${color.toLowerCase()}.webp`];
   image.alt = '';
   image.decoding = 'async';
   image.draggable = false;
@@ -70,6 +81,7 @@ function render(moveFocus = true) {
     title.tabIndex = -1;
     title.focus();
   }
+  void saveGame();
 }
 
 function renderStart() {
@@ -105,16 +117,12 @@ function renderStart() {
     event.preventDefault();
     const names = [0, 1].map(index => form.elements[`player${index}`].value.trim() || `Player ${index + 1}`);
     const count = Number(form.elements.edition.value);
-    const startGame = () => {
-      game.names = names;
-      if (count !== game.expeditionCount) {
-        game.expeditionCount = count; game.rounds = createRounds(count); game.round = 0; game.step = 0;
-      }
-      game.screen = 'entry'; render();
+    const begin = () => {
+      startGame(game, names, count);
+      render();
     };
-    const hasCards = game.rounds.some(round => round.some(player => player.some(expedition => expedition.numbers.length || expedition.wagers.length)));
-    if (count !== game.expeditionCount && hasCards) confirmReset(startGame, 'Changing the game edition clears the current cards and scores from all three rounds.');
-    else startGame();
+    if (count !== game.expeditionCount && hasCards(game)) confirmReset(begin, 'Changing the game edition clears the current cards and scores from all three rounds.');
+    else begin();
   });
   app.append(form);
 }
@@ -142,7 +150,7 @@ function renderEntry() {
   for (let value = 1; value <= 3; value++) {
     const selected = expedition.wagers.includes(value);
     const card = button('Wager', () => {
-      expedition.wagers = selected ? expedition.wagers.filter(wager => wager !== value) : [...expedition.wagers, value];
+      toggleCard(game, 'wagers', value);
       render(false);
       app.querySelector(`[data-wager="${value}"]`).focus();
     }, `card wager-card${selected ? ' selected' : ''}`);
@@ -160,7 +168,7 @@ function renderEntry() {
   for (let value = 2; value <= 10; value++) {
     const selected = expedition.numbers.includes(value);
     const card = button(String(value), () => {
-      expedition.numbers = selected ? expedition.numbers.filter(number => number !== value) : [...expedition.numbers, value].sort((a, b) => a - b);
+      toggleCard(game, 'numbers', value);
       render(false);
       app.querySelector(`[data-card="${value}"]`).focus();
     }, `card${selected ? ' selected' : ''}`);
@@ -181,15 +189,12 @@ function renderEntry() {
   app.append(panel);
   const nav = element('div', undefined, 'navigation');
   nav.append(button('Back', () => {
-    if (game.step > 0) game.step--;
-    else if (game.round > 0) { game.round--; game.screen = 'summary'; }
-    else game.screen = 'start';
+    goBack(game);
     render();
   }, 'secondary'));
   const nextLabel = game.step === game.expeditionCount * 2 - 1 ? 'Show round results' : color === game.expeditionCount - 1 ? 'Next player' : 'Next color';
   nav.append(button(nextLabel, () => {
-    if (game.step === game.expeditionCount * 2 - 1) game.screen = 'summary';
-    else game.step++;
+    goNext(game);
     render();
   }, 'primary'));
   app.append(nav);
@@ -238,14 +243,28 @@ function renderSummary() {
   history.append(historyHead, historyBody); panel.append(history);
   app.append(panel);
   const nav = element('div', undefined, 'navigation');
-  nav.append(button('Back to cards', () => { game.step = game.expeditionCount * 2 - 1; game.screen = 'entry'; render(); }, 'secondary'));
+  nav.append(button('Back to cards', () => { goBack(game); render(); }, 'secondary'));
   nav.append(button(final ? 'New game' : `Start round ${game.round + 2}`, () => {
     if (final) {
       confirmReset(); return;
-    } else { game.round++; game.step = 0; game.screen = 'entry'; }
+    } else goNext(game);
     render();
   }, 'primary'));
   app.append(nav);
 }
 
 render(false);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') void saveGame();
+});
+await setupPlatform({
+  onPause: saveGame,
+  onBack() {
+    const dialog = document.querySelector('dialog[open]');
+    if (dialog) { dialog.close(); return true; }
+    if (game.screen === 'start') return false;
+    goBack(game);
+    render();
+    return true;
+  },
+});

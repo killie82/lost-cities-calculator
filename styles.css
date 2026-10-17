@@ -1,6 +1,7 @@
 :root { color-scheme: dark; font-family: system-ui, sans-serif; color: #edf2f8; background: #0b1422; font-size: 16px; }
 * { box-sizing: border-box; }
-body { margin: 0; }
+body { margin: 0; padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+html { min-height: 100%; }
 .masthead { max-width: 760px; margin: auto; padding: 28px 24px; display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid #2b3c53; }
 .brand { font-weight: 850; letter-spacing: .16em; } .subtitle { color: #bac6d8; }
 main { max-width: 760px; margin: auto; padding: 36px 24px; min-height: 70vh; }
@@ -34,6 +35,7 @@ h1:focus { outline: none; }
 .edition-option input { width: 20px; height: 20px; margin: 0; flex-shrink: 0; accent-color: #ffc857; }
 .reset-dialog { max-width: 460px; width: calc(100% - 32px); background: #132338; color: #edf2f8; border: 1px solid #60718a; border-radius: 18px; padding: 24px; }
 .reset-dialog::backdrop { background: #000b; }
+.reset-dialog { max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto; }
 .reset-dialog h2 { margin-top: 0; font-size: 1.5rem; }
 .reset-dialog p { line-height: 1.6; color: #bac6d8; }
 .danger { background: #ff939c; color: #112036; border-color: #ff939c; }
